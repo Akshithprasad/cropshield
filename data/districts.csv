@@ -1,0 +1,21 @@
+district,state,road_gap,connectivity_gap,cold_storage_gap,weather_stress
+Bidar,Karnataka,0.82,0.78,0.91,0.61
+Raichur,Karnataka,0.79,0.81,0.88,0.72
+Kalahandi,Odisha,0.85,0.83,0.92,0.68
+Nuapada,Odisha,0.83,0.86,0.89,0.71
+Sheopur,Madhya Pradesh,0.78,0.74,0.85,0.65
+Barwani,Madhya Pradesh,0.76,0.79,0.83,0.69
+Malkangiri,Odisha,0.88,0.91,0.87,0.74
+Nabarangpur,Odisha,0.81,0.84,0.86,0.67
+Gadchiroli,Maharashtra,0.84,0.87,0.79,0.63
+Washim,Maharashtra,0.72,0.76,0.84,0.71
+Kushinagar,Uttar Pradesh,0.74,0.71,0.88,0.58
+Bahraich,Uttar Pradesh,0.77,0.73,0.91,0.62
+Shravasti,Uttar Pradesh,0.86,0.89,0.93,0.66
+Balrampur,Uttar Pradesh,0.80,0.82,0.90,0.64
+Surguja,Chhattisgarh,0.75,0.77,0.82,0.59
+Koriya,Chhattisgarh,0.73,0.75,0.81,0.57
+Dantewada,Chhattisgarh,0.87,0.92,0.88,0.76
+Sukma,Chhattisgarh,0.89,0.94,0.86,0.78
+Dumka,Jharkhand,0.76,0.78,0.83,0.61
+Pakur,Jharkhand,0.78,0.80,0.85,0.63
