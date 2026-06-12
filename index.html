@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CropShield — Infrastructure Crop Risk Predictor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0D1117;
+    --bg2: #161B22;
+    --bg3: #1C2128;
+    --amber: #F5A623;
+    --amber-dim: #c4841a;
+    --teal: #1D9E75;
+    --teal-light: #2ec891;
+    --text: #E6EDF3;
+    --muted: #7D8590;
+    --border: rgba(255,255,255,0.08);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  /* grain overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 999;
+    opacity: 0.4;
+  }
+
+  /* NAV */
+  nav {
+    position: fixed; top: 0; width: 100%; z-index: 100;
+    padding: 1.2rem 2rem;
+    display: flex; justify-content: space-between; align-items: center;
+    background: rgba(13,17,23,0.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-logo {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.4rem; font-weight: 700;
+    color: var(--amber); letter-spacing: 0.02em;
+  }
+  .nav-links { display: flex; gap: 2rem; }
+  .nav-links a {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem; color: var(--muted);
+    text-decoration: none; letter-spacing: 0.08em;
+    text-transform: uppercase; transition: color 0.2s;
+  }
+  .nav-links a:hover { color: var(--amber); }
+
+  /* SECTIONS */
+  section { padding: 7rem 2rem; max-width: 1100px; margin: 0 auto; }
+
+  /* HERO */
+  #hero {
+    min-height: 100vh;
+    max-width: 100%;
+    padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    position: relative; overflow: hidden;
+  }
+  .hero-inner {
+    max-width: 900px;
+    padding: 2rem;
+    text-align: center;
+    position: relative; z-index: 2;
+  }
+  .hero-tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem; letter-spacing: 0.15em;
+    text-transform: uppercase; color: var(--teal);
+    border: 1px solid var(--teal);
+    padding: 0.3rem 0.8rem; border-radius: 2px;
+    display: inline-block; margin-bottom: 2rem;
+  }
+  h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(2.4rem, 6vw, 4.8rem);
+    font-weight: 700; line-height: 1.1;
+    margin-bottom: 1.5rem;
+    color: var(--text);
+  }
+  h1 em { color: var(--amber); font-style: normal; }
+  .hero-sub {
+    font-size: 1.1rem; color: var(--muted);
+    max-width: 620px; margin: 0 auto 2.5rem;
+    line-height: 1.8;
+  }
+  .btn {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem; letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.9rem 2rem;
+    text-decoration: none;
+    transition: all 0.2s;
+    cursor: pointer; border: none;
+  }
+  .btn-primary {
+    background: var(--amber); color: #0D1117;
+    font-weight: 500;
+  }
+  .btn-primary:hover { background: #ffc04d; transform: translateY(-2px); }
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .btn-outline:hover { border-color: var(--amber); color: var(--amber); }
+
+  /* India map SVG */
+  .map-bg {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0.12; pointer-events: none;
+  }
+  .map-bg svg { width: 60%; max-width: 500px; height: auto; }
+
+  /* pulsing dots */
+  .pulse-dot {
+    position: absolute;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--amber);
+  }
+  .pulse-dot::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 1.5px solid var(--amber);
+    animation: pulse 2s infinite;
+    opacity: 0;
+  }
+  @keyframes pulse {
+    0% { transform: scale(0.8); opacity: 0.8; }
+    100% { transform: scale(2.2); opacity: 0; }
+  }
+  .d1 { top: 38%; left: 44%; animation-delay: 0s; }
+  .d2 { top: 32%; left: 55%; animation-delay: 0.4s; }
+  .d3 { top: 52%; left: 40%; animation-delay: 0.8s; }
+  .d4 { top: 45%; left: 58%; animation-delay: 1.2s; }
+  .d5 { top: 60%; left: 52%; animation-delay: 1.6s; }
+  .d6 { top: 28%; left: 48%; animation-delay: 2s; }
+
+  /* SECTION TITLES */
+  .section-tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem; letter-spacing: 0.15em;
+    text-transform: uppercase; color: var(--amber);
+    margin-bottom: 0.6rem;
+  }
+  h2 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(2rem, 4vw, 3.2rem);
+    font-weight: 700; line-height: 1.15;
+    margin-bottom: 1rem; color: var(--text);
+  }
+  h2 em { color: var(--amber); font-style: normal; }
+
+  /* PROBLEM SECTION */
+  #problem { border-top: 1px solid var(--border); }
+  .problem-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5px;
+    margin: 3rem 0;
+    border: 1.5px solid var(--border);
+  }
+  .problem-card {
+    background: var(--bg2);
+    padding: 2rem;
+    transition: background 0.2s;
+  }
+  .problem-card:hover { background: var(--bg3); }
+  .p-icon {
+    font-size: 1.8rem; margin-bottom: 1rem;
+    display: block;
+  }
+  .p-stat {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 2.2rem; font-weight: 700;
+    color: var(--amber); line-height: 1;
+    margin-bottom: 0.5rem;
+  }
+  .p-title {
+    font-size: 0.85rem; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); margin-bottom: 0.8rem;
+  }
+  .p-desc { font-size: 0.9rem; color: var(--muted); line-height: 1.7; }
+  .callout {
+    border-left: 3px solid var(--amber);
+    padding: 1.2rem 1.5rem;
+    background: rgba(245,166,35,0.06);
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.3rem; font-style: italic;
+    color: var(--text); line-height: 1.5;
+    margin-top: 2.5rem;
+  }
+
+  /* HOW IT WORKS */
+  #how { border-top: 1px solid var(--border); }
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0;
+    margin: 3rem 0 3.5rem;
+    position: relative;
+  }
+  .step {
+    padding: 2rem 1.5rem;
+    border: 1px solid var(--border);
+    border-right: none;
+    position: relative;
+  }
+  .step:last-child { border-right: 1px solid var(--border); }
+  .step-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem; letter-spacing: 0.15em;
+    color: var(--teal); text-transform: uppercase;
+    margin-bottom: 1rem;
+  }
+  .step h3 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.3rem; font-weight: 600;
+    color: var(--text); margin-bottom: 0.5rem;
+  }
+  .step p { font-size: 0.85rem; color: var(--muted); line-height: 1.7; }
+  .step-arrow {
+    position: absolute; right: -14px; top: 50%;
+    transform: translateY(-50%);
+    width: 28px; height: 28px;
+    background: var(--bg);
+    border: 1px solid var(--amber);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.7rem; color: var(--amber);
+    z-index: 2;
+  }
+  .step:last-child .step-arrow { display: none; }
+
+  /* DASHBOARD MOCKUP */
+  .dashboard-mock {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.5rem 2rem;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  .mock-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .mock-district {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.5rem; font-weight: 700;
+  }
+  .mock-state {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem; color: var(--muted); margin-top: 2px;
+  }
+  .mock-score-wrap { text-align: right; }
+  .mock-score {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 3rem; font-weight: 700;
+    color: var(--amber); line-height: 1;
+  }
+  .mock-score-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem; color: var(--muted); letter-spacing: 0.1em;
+  }
+  .mock-risk-badge {
+    display: inline-block;
+    background: rgba(245,166,35,0.15);
+    color: var(--amber);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem; letter-spacing: 0.1em;
+    padding: 3px 8px; border-radius: 2px;
+    margin-top: 4px;
+  }
+  .factor-row {
+    margin-bottom: 1rem;
+  }
+  .factor-label {
+    display: flex; justify-content: space-between;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem; color: var(--muted);
+    margin-bottom: 5px;
+  }
+  .factor-bar { height: 4px; background: var(--bg3); border-radius: 2px; }
+  .factor-fill { height: 100%; border-radius: 2px; background: var(--amber); transition: width 1s ease; }
+  .factor-fill.teal { background: var(--teal); }
+  .factor-fill.red { background: #E24B4A; }
+
+  /* IMPACT */
+  #impact { border-top: 1px solid var(--border); }
+  .impact-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem; margin: 3rem 0;
+  }
+  .impact-card {
+    border: 1px solid var(--border);
+    padding: 2rem;
+    position: relative; overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .impact-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0;
+    width: 3px; height: 100%;
+    background: var(--teal);
+  }
+  .impact-card:hover { border-color: rgba(29,158,117,0.4); }
+  .impact-who {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--teal);
+    margin-bottom: 0.7rem;
+  }
+  .impact-card h3 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.3rem; font-weight: 600;
+    color: var(--text); margin-bottom: 0.7rem;
+  }
+  .impact-card p { font-size: 0.88rem; color: var(--muted); line-height: 1.7; }
+
+  .counters {
+    display: grid;
+    grid-template-columns: repeat(3,1fr);
+    gap: 1px;
+    border: 1px solid var(--border);
+    margin-top: 3rem;
+  }
+  .counter-cell {
+    padding: 2.5rem 2rem;
+    background: var(--bg2);
+    text-align: center;
+  }
+  .counter-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 3.5rem; font-weight: 700;
+    color: var(--amber); line-height: 1;
+    display: block;
+  }
+  .counter-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--muted);
+    margin-top: 0.5rem;
+  }
+
+  /* SDG */
+  #sdg { border-top: 1px solid var(--border); }
+  .sdg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: center; margin-top: 2.5rem; }
+  .sdg-text p { color: var(--muted); font-size: 0.95rem; line-height: 1.9; }
+  .sdg-pills { display: flex; flex-direction: column; gap: 1rem; }
+  .sdg-pill {
+    display: flex; align-items: center; gap: 1rem;
+    border: 1px solid var(--border);
+    padding: 1rem 1.5rem;
+    transition: border-color 0.2s;
+  }
+  .sdg-pill:hover { border-color: rgba(245,166,35,0.4); }
+  .sdg-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem; color: var(--amber);
+    font-weight: 500; white-space: nowrap;
+  }
+  .sdg-pill span { font-size: 0.88rem; color: var(--muted); }
+
+  /* ABOUT */
+  #about {
+    border-top: 1px solid var(--border);
+    text-align: center;
+    max-width: 700px;
+  }
+  #about p { color: var(--muted); font-size: 0.95rem; line-height: 1.9; margin-bottom: 2.5rem; }
+  .btn-group { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+
+  /* FOOTER */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 2rem;
+    text-align: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem; letter-spacing: 0.1em;
+    color: var(--muted);
+  }
+  footer span { color: var(--amber); }
+
+  /* SCROLL ANIMATIONS */
+  .fade-up {
+    opacity: 0; transform: translateY(28px);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+  }
+  .fade-up.visible { opacity: 1; transform: translateY(0); }
+
+  @media (max-width: 700px) {
+    .sdg-grid { grid-template-columns: 1fr; gap: 2rem; }
+    .counters { grid-template-columns: 1fr; }
+    .steps { grid-template-columns: 1fr; }
+    .step { border-right: 1px solid var(--border); border-bottom: none; }
+    .step:last-child { border-bottom: 1px solid var(--border); }
+    .step-arrow { display: none; }
+    nav .nav-links { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">CropShield</div>
+  <div class="nav-links">
+    <a href="#problem">Problem</a>
+    <a href="#how">Solution</a>
+    <a href="#impact">Impact</a>
+    <a href="#sdg">SDG 9</a>
+    <a href="#about">About</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div id="hero">
+  <div class="map-bg">
+    <svg viewBox="0 0 400 500" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M200 30 L240 50 L270 45 L290 70 L310 80 L320 110 L340 130 L350 160 L340 190 L320 210 L330 240 L310 260 L290 280 L270 310 L250 340 L230 370 L210 400 L200 430 L190 400 L170 370 L150 340 L130 310 L110 280 L90 260 L70 240 L80 210 L60 190 L50 160 L60 130 L80 110 L90 80 L110 70 L130 45 L160 50 Z" stroke="#F5A623" stroke-width="1.5" fill="rgba(245,166,35,0.03)"/>
+      <path d="M200 430 L210 450 L200 470 L190 450 Z" stroke="#F5A623" stroke-width="1.5" fill="rgba(245,166,35,0.03)"/>
+    </svg>
+  </div>
+
+  <div class="pulse-dot d1"></div>
+  <div class="pulse-dot d2"></div>
+  <div class="pulse-dot d3"></div>
+  <div class="pulse-dot d4"></div>
+  <div class="pulse-dot d5"></div>
+  <div class="pulse-dot d6"></div>
+
+  <div class="hero-inner">
+    <div class="hero-tag">SDG 9 · Infrastructure & Innovation</div>
+    <h1>India wastes <em>₹90,000 crore</em> of crops every year.<br>Not because of bad farming.<br>Because of <em>broken infrastructure.</em></h1>
+    <p class="hero-sub">CropShield uses open government data to predict which districts are most at risk — before the harvest is lost.</p>
+    <a href="#problem" class="btn btn-primary">See How It Works ↓</a>
+  </div>
+</div>
+
+<!-- PROBLEM -->
+<section id="problem">
+  <div class="fade-up">
+    <div class="section-tag">// The Problem</div>
+    <h2>The real reason <em>crops fail</em></h2>
+  </div>
+
+  <div class="problem-grid fade-up">
+    <div class="problem-card">
+      <span class="p-icon">🛣️</span>
+      <div class="p-stat">54%</div>
+      <div class="p-title">Rural roads unpaved</div>
+      <p class="p-desc">Produce rots before it reaches mandis. Refrigerated trucks can't operate on broken roads, turning good harvests into losses.</p>
+    </div>
+    <div class="problem-card">
+      <span class="p-icon">🏭</span>
+      <div class="p-stat">1:1.2L</div>
+      <div class="p-title">Cold storage per farmers</div>
+      <p class="p-desc">Only one cold storage unit per 1.2 lakh farmers. Without cold chains, perishables spoil within 24–48 hours of harvest.</p>
+    </div>
+    <div class="problem-card">
+      <span class="p-icon">📡</span>
+      <div class="p-stat">25,000+</div>
+      <div class="p-title">Villages with no internet</div>
+      <p class="p-desc">Farmers can't access price alerts, weather warnings, or government scheme updates. Invisible to the digital economy.</p>
+    </div>
+  </div>
+
+  <div class="callout fade-up">
+    "This isn't a farming problem. It's an infrastructure problem. And infrastructure can be measured, mapped, and fixed."
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div class="fade-up">
+    <div class="section-tag">// The Solution</div>
+    <h2>How <em>CropShield</em> works</h2>
+  </div>
+
+  <div class="steps fade-up">
+    <div class="step">
+      <div class="step-num">Step 01</div>
+      <h3>Data Collection</h3>
+      <p>Pulls road density, telecom coverage, cold storage capacity, and weather anomaly data from data.gov.in, TRAI, NHB, and IMD.</p>
+      <div class="step-arrow">→</div>
+    </div>
+    <div class="step">
+      <div class="step-num">Step 02</div>
+      <h3>Normalization</h3>
+      <p>Each data point is cleaned and normalized to a 0–1 scale per district, making all factors comparable regardless of unit.</p>
+      <div class="step-arrow">→</div>
+    </div>
+    <div class="step">
+      <div class="step-num">Step 03</div>
+      <h3>Risk Scoring</h3>
+      <p>A weighted formula combines all four factors into a single Infrastructure Crop Risk Index (0–100) per district.</p>
+      <div class="step-arrow">→</div>
+    </div>
+    <div class="step">
+      <div class="step-num">Step 04</div>
+      <h3>Visualization</h3>
+      <p>Results shown on an interactive India map and district dashboard. Downloadable as CSV for policymakers and NGOs.</p>
+    </div>
+  </div>
+
+  <div class="dashboard-mock fade-up">
+    <div class="mock-header">
+      <div>
+        <div class="mock-district">Nashik District</div>
+        <div class="mock-state">MAHARASHTRA · INDIA</div>
+      </div>
+      <div class="mock-score-wrap">
+        <div class="mock-score">74</div>
+        <div class="mock-score-label">/ 100 RISK INDEX</div>
+        <div class="mock-risk-badge">HIGH RISK</div>
+      </div>
+    </div>
+
+    <div class="factor-row">
+      <div class="factor-label"><span>Road connectivity gap</span><span>60%</span></div>
+      <div class="factor-bar"><div class="factor-fill" style="width:60%"></div></div>
+    </div>
+    <div class="factor-row">
+      <div class="factor-label"><span>Telecom connectivity gap</span><span>80%</span></div>
+      <div class="factor-bar"><div class="factor-fill" style="width:80%"></div></div>
+    </div>
+    <div class="factor-row">
+      <div class="factor-label"><span>Cold storage gap</span><span>85%</span></div>
+      <div class="factor-bar"><div class="factor-fill red" style="width:85%"></div></div>
+    </div>
+    <div class="factor-row">
+      <div class="factor-label"><span>Weather stress index</span><span>55%</span></div>
+      <div class="factor-bar"><div class="factor-fill teal" style="width:55%"></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- IMPACT -->
+<section id="impact">
+  <div class="fade-up">
+    <div class="section-tag">// The Impact</div>
+    <h2>What this <em>makes possible</em></h2>
+  </div>
+
+  <div class="impact-grid fade-up">
+    <div class="impact-card">
+      <div class="impact-who">For policymakers</div>
+      <h3>Prioritize where it matters most</h3>
+      <p>Identify the top 20 highest-risk districts nationwide and direct infrastructure budgets where post-harvest loss is most likely to occur.</p>
+    </div>
+    <div class="impact-card">
+      <div class="impact-who">For NGOs & agri-startups</div>
+      <h3>Deploy before the next harvest</h3>
+      <p>Deploy cold storage units, logistics support, and connectivity drives to villages flagged by CropShield before the season begins.</p>
+    </div>
+    <div class="impact-card">
+      <div class="impact-who">For farmers</div>
+      <h3>Visibility into local gaps</h3>
+      <p>A district-level risk report shareable via SMS or WhatsApp, giving farmers and cooperatives visibility into the infrastructure gaps near them.</p>
+    </div>
+  </div>
+
+  <div class="counters fade-up">
+    <div class="counter-cell">
+      <span class="counter-num" data-target="736">0</span>
+      <div class="counter-label">Districts analyzed</div>
+    </div>
+    <div class="counter-cell">
+      <span class="counter-num" data-target="4">0</span>
+      <div class="counter-label">Infrastructure factors</div>
+    </div>
+    <div class="counter-cell">
+      <span class="counter-num" data-target="20">0</span>
+      <div class="counter-label">Risk zones identified</div>
+    </div>
+  </div>
+</section>
+
+<!-- SDG 9 -->
+<section id="sdg">
+  <div class="fade-up">
+    <div class="section-tag">// The Purpose</div>
+    <h2>Built for <em>SDG 9</em></h2>
+  </div>
+
+  <div class="sdg-grid fade-up">
+    <div class="sdg-text">
+      <p>SDG 9 calls for resilient infrastructure, inclusive industrialization, and innovation. CropShield treats post-harvest loss as an infrastructure failure — not a farming one.</p>
+      <br>
+      <p>By surfacing data-driven gaps in roads, cold chains, and connectivity, it gives decision-makers the visibility to build the infrastructure India's farmers actually need. A blueprint that can scale across the Global South.</p>
+    </div>
+    <div class="sdg-pills">
+      <div class="sdg-pill">
+        <span class="sdg-num">9.1</span>
+        <span>Develop resilient rural infrastructure to support economic development and human well-being</span>
+      </div>
+      <div class="sdg-pill">
+        <span class="sdg-num">9.4</span>
+        <span>Upgrade infrastructure for sustainability, with greater resource efficiency</span>
+      </div>
+      <div class="sdg-pill">
+        <span class="sdg-num">9.c</span>
+        <span>Significantly increase access to ICT and universal internet access in least-developed regions</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ABOUT -->
+<section id="about" style="margin:0 auto;">
+  <div class="fade-up">
+    <div class="section-tag" style="text-align:center">// About</div>
+    <h2>Built by a student.<br><em>Driven by data.</em></h2>
+    <p>CropShield was built as part of an application to the Future Minds Summit 2026, Thailand — a global forum for youth innovators working on the UN Sustainable Development Goals. The tool is open-source, data-driven, and built to be used by anyone who wants to fix India's post-harvest infrastructure gap.</p>
+    <div class="btn-group">
+      <a href="#" class="btn btn-primary">View on GitHub ↗</a>
+      <a href="#" class="btn btn-outline">Explore the Dashboard ↗</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>CropShield &nbsp;·&nbsp; Built for <span>SDG 9</span> &nbsp;·&nbsp; Future Minds Summit 2026 &nbsp;·&nbsp; Thailand</p>
+</footer>
+
+<script>
+  // Scroll fade-in
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.fade-up').forEach(el => obs.observe(el));
+
+  // Counter animation
+  function animateCounter(el) {
+    const target = +el.dataset.target;
+    const dur = 1800;
+    const start = performance.now();
+    function step(now) {
+      const p = Math.min((now - start) / dur, 1);
+      const ease = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(ease * target);
+      if(p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  const counterObs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if(e.isIntersecting) {
+        animateCounter(e.target);
+        counterObs.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.5 });
+  document.querySelectorAll('.counter-num[data-target]').forEach(el => counterObs.observe(el));
+</script>
+</body>
+</html>
